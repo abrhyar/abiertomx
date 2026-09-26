@@ -30,14 +30,13 @@ int main() {
         init_pair(3, COLOR_GREEN, COLOR_BLACK);  // Batería / Estado
     }
 
-    // Lista con Tags limpios y compatibles con cualquier terminal
     std::vector<MenuItem> menuItems = {
-        {"[PAD]", "Juegos (GBA, SNES)"},
-        {"[MUS]", "Música"},
-        {"[VID]", "Vídeos"},
-        {"[IMG]", "Fotos"},
-        {"[CFG]", "Configuración"},
-        {"[OFF]", "Salir"}
+        {"🎮", "Juegos (GBA, SNES)"},
+        {"🎵", "Música"},
+        {"🎬", "Vídeos"},
+        {"🖼️ ", "Fotos"},
+        {"⚙️ ", "Configuración"},
+        {"⚡", "Salir"}
     };
 
     int selected = 0;
