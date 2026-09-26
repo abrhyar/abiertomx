@@ -1,10 +1,10 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17 -Isrc
-LIBS = -lSDL2 -lSDL2_image -lSDL2_ttf
+LIBS = -lncursesw
 
 SRC = $(wildcard src/*.cpp)
 OBJ = $(SRC:.cpp=.o)
-TARGET = abierto
+TARGET = alk
 
 all: $(TARGET)
 
