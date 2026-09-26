@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17 -Isrc
-LDFLAGS = -lSDL2 -lSDL2_ttf
+LDFLAGS = -lncursesw
 
 SRC = src/main.cpp
 OBJ = $(SRC:.cpp=.o)

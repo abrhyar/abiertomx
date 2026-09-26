@@ -1,174 +1,112 @@
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
 #include <iostream>
+#include <locale.h>
+#include <ncurses.h>
 #include <vector>
 #include <string>
-#include <cstdlib> // Para system()
-
-const int SCREEN_WIDTH = 320;
-const int SCREEN_HEIGHT = 240;
+#include <cstdlib>
 
 struct MenuItem {
+    std::string tag;
     std::string title;
-    std::string action; // Comando a ejecutar
+    std::string command;
 };
 
-// Función para ejecutar comandos pausando temporalmente la ventana SDL
-void executeCommand(SDL_Window* window, const std::string& command) {
-    if (command.empty()) return;
-
-    // Minimizar/Ocultar la ventana de ALk para dar paso a la app externa
-    SDL_HideWindow(window);
-
-    // Ejecutar el comando en el sistema
-    std::system(command.c_str());
-
-    // Al cerrar la app externa, volvemos a mostrar la ventana de ALk
-    SDL_ShowWindow(window);
-    SDL_RaiseWindow(window);
+void runCommand(const std::string& cmd) {
+    if (cmd.empty()) return;
+    
+    // Pausar NCurses para dejar la TTY limpia a la sub-aplicacion
+    endwin();
+    std::system(cmd.c_str());
+    
+    // Restaurar NCurses al regresar
+    refresh();
+    curs_set(0);
 }
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0) {
-        return 1;
+int main() {
+    setlocale(LC_ALL, "");
+
+    initscr();
+    cbreak();
+    noecho();
+    keypad(stdscr, TRUE); // Captura correcta de flechas en TTY
+    curs_set(0);
+
+    if (has_colors()) {
+        start_color();
+        use_default_colors();
+        assume_default_colors(COLOR_WHITE, COLOR_BLACK);
+
+        init_pair(1, COLOR_WHITE, COLOR_BLUE);
+        init_pair(2, COLOR_CYAN, COLOR_BLACK);
+        init_pair(3, COLOR_GREEN, COLOR_BLACK);
     }
 
-    if (TTF_Init() < 0) {
-        SDL_Quit();
-        return 1;
-    }
-
-    SDL_Window* window = SDL_CreateWindow(
-        "ALk Launcher",
-        SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED,
-        SCREEN_WIDTH,
-        SCREEN_HEIGHT,
-        SDL_WINDOW_SHOWN
-    );
-
-    if (!window) {
-        TTF_Quit();
-        SDL_Quit();
-        return 1;
-    }
-
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    SDL_ShowCursor(SDL_DISABLE);
-
-    TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14);
-    if (!font) {
-        font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14);
-    }
-
-    std::vector<MenuItem> items = {
-        {"Juegos (GBA, SNES)", ""},
-        {"Musica", ""},
-        {"Videos", ""},
-        {"Fotos", ""},
-        // Inicia xterm a pantalla completa ejecutando armbian-config
-        {"Configuracion", "sudo xterm -fullscreen -e armbian-config"}, 
-        {"Salir", "EXIT"}
+    std::vector<MenuItem> menuItems = {
+        {"[PAD]", "Juegos (GBA, SNES)", ""},
+        {"[MUS]", "Musica", ""},
+        {"[VID]", "Videos", ""},
+        {"[IMG]", "Fotos", ""},
+        {"[CFG]", "Configuracion", "sudo armbian-config"},
+        {"[OFF]", "Salir", "EXIT"}
     };
 
     int selected = 0;
     bool running = true;
-    SDL_Event e;
 
     while (running) {
-        while (SDL_PollEvent(&e) != 0) {
-            if (e.type == SDL_QUIT) {
-                running = false;
-            } else if (e.type == SDL_KEYDOWN) {
-                switch (e.key.keysym.sym) {
-                    case SDLK_UP:
-                        selected = (selected - 1 + (int)items.size()) % (int)items.size();
-                        break;
-                    case SDLK_DOWN:
-                        selected = (selected + 1) % (int)items.size();
-                        break;
-                    case SDLK_RETURN:
-                    case SDLK_KP_ENTER:
-                        if (items[selected].action == "EXIT") {
-                            running = false;
-                        } else if (!items[selected].action.empty()) {
-                            executeCommand(window, items[selected].action);
-                        }
-                        break;
-                    case SDLK_ESCAPE:
-                        running = false;
-                        break;
-                }
-            }
-        }
-
-        // Renderizado de UI
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderClear(renderer);
+        clear();
 
         // Header
-        if (font) {
-            SDL_Color headerColor = {0, 255, 200, 255};
-            SDL_Surface* headSurf = TTF_RenderUTF8_Blended(font, "ABIERTO v0.1 | ALk", headerColor);
-            if (headSurf) {
-                SDL_Texture* headTex = SDL_CreateTextureFromSurface(renderer, headSurf);
-                SDL_Rect headRect = {10, 10, headSurf->w, headSurf->h};
-                SDL_RenderCopy(renderer, headTex, NULL, &headRect);
-                SDL_FreeSurface(headSurf);
-                SDL_DestroyTexture(headTex);
+        attron(COLOR_PAIR(2) | A_BOLD);
+        mvprintw(0, 1, "ABIERTO v0.1 | ALk");
+        attroff(COLOR_PAIR(2) | A_BOLD);
+
+        attron(COLOR_PAIR(3));
+        mvprintw(0, 30, "[64%%]");
+        attroff(COLOR_PAIR(3));
+
+        mvhline(1, 0, ACS_HLINE, 38);
+
+        // Menú
+        int startY = 3;
+        for (size_t i = 0; i < menuItems.size(); ++i) {
+            if ((int)i == selected) {
+                attron(COLOR_PAIR(1) | A_BOLD);
+                mvprintw(startY + i, 1, "> %-5s %-26s", menuItems[i].tag.c_str(), menuItems[i].title.c_str());
+                attroff(COLOR_PAIR(1) | A_BOLD);
+            } else {
+                mvprintw(startY + i, 3, "%-5s %s", menuItems[i].tag.c_str(), menuItems[i].title.c_str());
             }
         }
-
-        SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
-        SDL_RenderDrawLine(renderer, 10, 32, 310, 32);
-
-        // Opciones del Menú
-        for (size_t i = 0; i < items.size(); ++i) {
-            bool isSelected = ((int)i == selected);
-
-            if (isSelected) {
-                SDL_Rect selectBox = {10, (int)(42 + i * 26), 300, 22};
-                SDL_SetRenderDrawColor(renderer, 0, 120, 215, 255);
-                SDL_RenderFillRect(renderer, &selectBox);
-            }
-
-            if (font) {
-                SDL_Color textColor = isSelected ? SDL_Color{255, 255, 255, 255} : SDL_Color{180, 180, 180, 255};
-                SDL_Surface* surface = TTF_RenderUTF8_Blended(font, items[i].title.c_str(), textColor);
-                if (surface) {
-                    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-                    SDL_Rect dstRect = {20, (int)(44 + i * 26), surface->w, surface->h};
-                    SDL_RenderCopy(renderer, texture, NULL, &dstRect);
-                    SDL_FreeSurface(surface);
-                    SDL_DestroyTexture(texture);
-                }
-            }
-        }
-
-        SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
-        SDL_RenderDrawLine(renderer, 10, 210, 310, 210);
 
         // Footer
-        if (font) {
-            SDL_Color footerColor = {120, 120, 120, 255};
-            SDL_Surface* footSurf = TTF_RenderUTF8_Blended(font, "[^v] Navegar   [ENTER] Entrar", footerColor);
-            if (footSurf) {
-                SDL_Texture* footTex = SDL_CreateTextureFromSurface(renderer, footSurf);
-                SDL_Rect footRect = {10, 218, footSurf->w, footSurf->h};
-                SDL_RenderCopy(renderer, footTex, NULL, &footRect);
-                SDL_FreeSurface(footSurf);
-                SDL_DestroyTexture(footTex);
-            }
-        }
+        mvhline(12, 0, ACS_HLINE, 38);
+        mvprintw(13, 1, "[^v] Navegar   [ENTER] Entrar");
 
-        SDL_RenderPresent(renderer);
-        SDL_Delay(16);
+        refresh();
+
+        int ch = getch();
+        switch (ch) {
+            case KEY_UP:
+            case 'k':
+                selected = (selected - 1 + (int)menuItems.size()) % (int)menuItems.size();
+                break;
+            case KEY_DOWN:
+            case 'j':
+                selected = (selected + 1) % (int)menuItems.size();
+                break;
+            case 10: // Enter
+            case KEY_ENTER:
+                if (menuItems[selected].command == "EXIT") {
+                    running = false;
+                } else if (!menuItems[selected].command.empty()) {
+                    runCommand(menuItems[selected].command);
+                }
+                break;
+        }
     }
 
-    if (font) TTF_CloseFont(font);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    TTF_Quit();
-    SDL_Quit();
+    endwin();
     return 0;
 }
