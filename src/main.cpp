@@ -29,12 +29,12 @@ int main() {
     }
 
     std::vector<MenuItem> menuItems = {
-        {"🎮", "Juegos (GBA, SNES)"},
-        {"🎵", "Música"},
-        {"🎬", "Vídeos"},
-        {"🖼️ ", "Fotos"},
-        {"⚙️ ", "Configuración"},
-        {"⚡", "Salir"}
+        {"\uf11b", "Juegos (GBA, SNES)"},  // 🎮 Mando / Gamepad
+        {"\uf001", "Música"},               // 🎵 Nota musical
+        {"\uf03d", "Vídeos"},               // 🎬 Cámara de video
+        {"\uf03e", "Fotos"},                // 🖼️ Imagen
+        {"\uf013", "Configuración"},        // ⚙️ Engranaje
+        {"\uf011", "Salir"}                 // ⚡ Botón Apagar
     };
 
     int selected = 0;
