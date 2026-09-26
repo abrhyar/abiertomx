@@ -3,28 +3,41 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <cstdlib> // Para system()
 
 const int SCREEN_WIDTH = 320;
 const int SCREEN_HEIGHT = 240;
 
 struct MenuItem {
     std::string title;
+    std::string action; // Comando a ejecutar
 };
 
+// Función para ejecutar comandos pausando temporalmente la ventana SDL
+void executeCommand(SDL_Window* window, const std::string& command) {
+    if (command.empty()) return;
+
+    // Minimizar/Ocultar la ventana de ALk para dar paso a la app externa
+    SDL_HideWindow(window);
+
+    // Ejecutar el comando en el sistema
+    std::system(command.c_str());
+
+    // Al cerrar la app externa, volvemos a mostrar la ventana de ALk
+    SDL_ShowWindow(window);
+    SDL_RaiseWindow(window);
+}
+
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
-    // Inicializar SDL2 y subsistema de video
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0) {
-        std::cerr << "Error al inicializar SDL2: " << SDL_GetError() << std::endl;
         return 1;
     }
 
     if (TTF_Init() < 0) {
-        std::cerr << "Error al inicializar TTF: " << TTF_GetError() << std::endl;
         SDL_Quit();
         return 1;
     }
 
-    // Crear ventana en modo Kiosk a resolución exacta (320x240)
     SDL_Window* window = SDL_CreateWindow(
         "ALk Launcher",
         SDL_WINDOWPOS_CENTERED,
@@ -35,29 +48,27 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     );
 
     if (!window) {
-        std::cerr << "Error al crear la ventana: " << SDL_GetError() << std::endl;
         TTF_Quit();
         SDL_Quit();
         return 1;
     }
 
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    SDL_ShowCursor(SDL_DISABLE); // Ocultar el puntero del mouse
+    SDL_ShowCursor(SDL_DISABLE);
 
-    // Cargar fuente TrueType por defecto del sistema Debian/Armbian
     TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14);
     if (!font) {
-        // Fallback a fuente Sans estándar si la Bold no está disponible
         font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14);
     }
 
+    // Definimos los ítems con sus respectivos comandos
     std::vector<MenuItem> items = {
-        {"Juegos (GBA, SNES)"},
-        {"Musica"},
-        {"Videos"},
-        {"Fotos"},
-        {"Configuracion"},
-        {"Salir"}
+        {"Juegos (GBA, SNES)", ""},
+        {"Musica", ""},
+        {"Videos", ""},
+        {"Fotos", ""},
+        {"Configuracion", "sudo armbian-config"}, // Launcher abre Armbian Config
+        {"Salir", "EXIT"}
     };
 
     int selected = 0;
@@ -65,7 +76,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     SDL_Event e;
 
     while (running) {
-        // Event Loop (Captura de entradas de teclado/mando)
         while (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_QUIT) {
                 running = false;
@@ -79,8 +89,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
                         break;
                     case SDLK_RETURN:
                     case SDLK_KP_ENTER:
-                        if (selected == (int)items.size() - 1) {
-                            running = false; // Salir
+                        if (items[selected].action == "EXIT") {
+                            running = false;
+                        } else if (!items[selected].action.empty()) {
+                            executeCommand(window, items[selected].action);
                         }
                         break;
                     case SDLK_ESCAPE:
@@ -90,13 +102,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
             }
         }
 
-        // 1. Limpiar pantalla (Fondo Negro)
+        // Renderizado de UI
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
-        // 2. Header
+        // Header
         if (font) {
-            SDL_Color headerColor = {0, 255, 200, 255}; // Cyan
+            SDL_Color headerColor = {0, 255, 200, 255};
             SDL_Surface* headSurf = TTF_RenderUTF8_Blended(font, "ABIERTO v0.1 | ALk", headerColor);
             if (headSurf) {
                 SDL_Texture* headTex = SDL_CreateTextureFromSurface(renderer, headSurf);
@@ -107,18 +119,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
             }
         }
 
-        // Línea divisoria
         SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
         SDL_RenderDrawLine(renderer, 10, 32, 310, 32);
 
-        // 3. Menú de Items
+        // Opciones del Menú
         for (size_t i = 0; i < items.size(); ++i) {
             bool isSelected = ((int)i == selected);
 
-            // Resaltado de selección
             if (isSelected) {
                 SDL_Rect selectBox = {10, (int)(42 + i * 26), 300, 22};
-                SDL_SetRenderDrawColor(renderer, 0, 120, 215, 255); // Azul selección
+                SDL_SetRenderDrawColor(renderer, 0, 120, 215, 255);
                 SDL_RenderFillRect(renderer, &selectBox);
             }
 
@@ -135,11 +145,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
             }
         }
 
-        // Línea divisoria inferior
         SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
         SDL_RenderDrawLine(renderer, 10, 210, 310, 210);
 
-        // 4. Footer
+        // Footer
         if (font) {
             SDL_Color footerColor = {120, 120, 120, 255};
             SDL_Surface* footSurf = TTF_RenderUTF8_Blended(font, "[^v] Navegar   [ENTER] Entrar", footerColor);
@@ -153,7 +162,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         }
 
         SDL_RenderPresent(renderer);
-        SDL_Delay(16); // Reducir uso de CPU (~60 FPS)
+        SDL_Delay(16);
     }
 
     if (font) TTF_CloseFont(font);
