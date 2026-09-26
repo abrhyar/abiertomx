@@ -61,13 +61,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14);
     }
 
-    // Definimos los ítems con sus respectivos comandos
     std::vector<MenuItem> items = {
         {"Juegos (GBA, SNES)", ""},
         {"Musica", ""},
         {"Videos", ""},
         {"Fotos", ""},
-        {"Configuracion", "sudo armbian-config"}, // Launcher abre Armbian Config
+        // Inicia xterm a pantalla completa ejecutando armbian-config
+        {"Configuracion", "sudo xterm -fullscreen -e armbian-config"}, 
         {"Salir", "EXIT"}
     };
 
