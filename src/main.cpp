@@ -24,7 +24,7 @@ void runCommand(const std::string& cmd) {
     curs_set(0);
 }
 
-// Submenú para Imágenes
+// --- SUBMENÚ DE FOTOS ---
 void showImageGallery() {
     std::string folderPath = std::string(getenv("HOME")) + "/Pictures";
     std::vector<std::string> images;
@@ -107,7 +107,7 @@ void showImageGallery() {
     }
 }
 
-// Submenú para Videos
+// --- SUBMENÚ DE VIDEOS ---
 void showVideoGallery() {
     std::string folderPath = std::string(getenv("HOME")) + "/Videos";
     std::vector<std::string> videos;
@@ -190,9 +190,9 @@ void showVideoGallery() {
     }
 }
 
-// Submenú para Juegos GBA
-void showGbaGallery() {
-    std::string folderPath = std::string(getenv("HOME")) + "/ROMs/GBA";
+// --- EXPLORADOR DE ROMS GENÉRICO ---
+void showRomExplorer(const std::string& systemName, const std::string& folderName, const std::vector<std::string>& extensions, const std::string& corePath) {
+    std::string folderPath = std::string(getenv("HOME")) + "/ROMs/" + folderName;
     std::vector<std::string> roms;
 
     if (fs::exists(folderPath) && fs::is_directory(folderPath)) {
@@ -200,8 +200,11 @@ void showGbaGallery() {
             if (entry.is_regular_file()) {
                 std::string ext = entry.path().extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext == ".gba" || ext == ".zip") {
-                    roms.push_back(entry.path().filename().string());
+                for (const auto& validExt : extensions) {
+                    if (ext == validExt) {
+                        roms.push_back(entry.path().filename().string());
+                        break;
+                    }
                 }
             }
         }
@@ -216,13 +219,13 @@ void showGbaGallery() {
         clear();
 
         attron(COLOR_PAIR(2) | A_BOLD);
-        mvprintw(0, 1, "ABIERTO | Game Boy Advance");
+        mvprintw(0, 1, ("ABIERTO | " + systemName).c_str());
         attroff(COLOR_PAIR(2) | A_BOLD);
 
         mvhline(1, 0, ACS_HLINE, 38);
 
         if (roms.empty()) {
-            mvprintw(3, 2, "No hay ROMs en ~/ROMs/GBA");
+            mvprintw(3, 2, ("No hay juegos en ~/ROMs/" + folderName).c_str());
             mvhline(12, 0, ACS_HLINE, 38);
             mvprintw(13, 1, "[ESC/q] Volver");
             refresh();
@@ -261,7 +264,13 @@ void showGbaGallery() {
             case 10:
             case KEY_ENTER: {
                 std::string fullPath = folderPath + "/" + roms[selected];
-                std::string cmd = "retroarch -L /usr/lib/aarch64-linux-gnu/libretro/mgba_libretro.so -f \"" + fullPath + "\"";
+                std::string cmd;
+                if (!corePath.empty()) {
+                    cmd = "retroarch -L " + corePath + " -f \"" + fullPath + "\"";
+                } else {
+                    // Para ejecutables de juegos variados/nativos
+                    cmd = "\"" + fullPath + "\"";
+                }
                 runCommand(cmd);
                 break;
             }
@@ -273,61 +282,39 @@ void showGbaGallery() {
     }
 }
 
-// Submenú para Juegos NES
-void showNesGallery() {
-    std::string folderPath = std::string(getenv("HOME")) + "/ROMs/NES";
-    std::vector<std::string> roms;
-
-    if (fs::exists(folderPath) && fs::is_directory(folderPath)) {
-        for (const auto& entry : fs::directory_iterator(folderPath)) {
-            if (entry.is_regular_file()) {
-                std::string ext = entry.path().extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (ext == ".nes" || ext == ".zip") {
-                    roms.push_back(entry.path().filename().string());
-                }
-            }
-        }
-    }
-
-    std::sort(roms.begin(), roms.end());
+// --- SUBMENÚ PRINCIPAL DE JUEGOS ---
+void showGamesMenu() {
+    std::vector<MenuItem> gameSystems = {
+        {"[GBA]", "Game Boy Advance", "GBA"},
+        {"[NES]", "Nintendo NES", "NES"},
+        {"[VAR]", "Juegos Variados", "MISC"}
+    };
 
     int selected = 0;
-    bool inGallery = true;
+    bool inSubmenu = true;
 
-    while (inGallery) {
+    while (inSubmenu) {
         clear();
 
         attron(COLOR_PAIR(2) | A_BOLD);
-        mvprintw(0, 1, "ABIERTO | Nintendo (NES)");
+        mvprintw(0, 1, "ABIERTO | Selector de Juegos");
         attroff(COLOR_PAIR(2) | A_BOLD);
 
         mvhline(1, 0, ACS_HLINE, 38);
 
-        if (roms.empty()) {
-            mvprintw(3, 2, "No hay ROMs en ~/ROMs/NES");
-            mvhline(12, 0, ACS_HLINE, 38);
-            mvprintw(13, 1, "[ESC/q] Volver");
-            refresh();
-
-            int ch = getch();
-            if (ch == 27 || ch == 'q') inGallery = false;
-            continue;
-        }
-
         int startY = 3;
-        for (size_t i = 0; i < roms.size() && i < 8; ++i) {
+        for (size_t i = 0; i < gameSystems.size(); ++i) {
             if ((int)i == selected) {
                 attron(COLOR_PAIR(1) | A_BOLD);
-                mvprintw(startY + i, 1, "> %-32s", roms[i].substr(0, 32).c_str());
+                mvprintw(startY + i, 1, "> %-5s %-26s", gameSystems[i].tag.c_str(), gameSystems[i].title.c_str());
                 attroff(COLOR_PAIR(1) | A_BOLD);
             } else {
-                mvprintw(startY + i, 3, "%-32s", roms[i].substr(0, 32).c_str());
+                mvprintw(startY + i, 3, "%-5s %s", gameSystems[i].tag.c_str(), gameSystems[i].title.c_str());
             }
         }
 
         mvhline(12, 0, ACS_HLINE, 38);
-        mvprintw(13, 1, "[^v] Navegar  [ENT] Jugar  [ESC] Atras");
+        mvprintw(13, 1, "[^v] Navegar  [ENT] Entrar  [ESC] Atras");
 
         refresh();
 
@@ -335,27 +322,31 @@ void showNesGallery() {
         switch (ch) {
             case KEY_UP:
             case 'k':
-                selected = (selected - 1 + (int)roms.size()) % (int)roms.size();
+                selected = (selected - 1 + (int)gameSystems.size()) % (int)gameSystems.size();
                 break;
             case KEY_DOWN:
             case 'j':
-                selected = (selected + 1) % (int)roms.size();
+                selected = (selected + 1) % (int)gameSystems.size();
                 break;
             case 10:
-            case KEY_ENTER: {
-                std::string fullPath = folderPath + "/" + roms[selected];
-                std::string cmd = "retroarch -L /usr/lib/aarch64-linux-gnu/libretro/nestopia_libretro.so -f \"" + fullPath + "\"";
-                runCommand(cmd);
+            case KEY_ENTER:
+                if (gameSystems[selected].command == "GBA") {
+                    showRomExplorer("Game Boy Advance", "GBA", {".gba", ".zip"}, "/usr/lib/aarch64-linux-gnu/libretro/mgba_libretro.so");
+                } else if (gameSystems[selected].command == "NES") {
+                    showRomExplorer("Nintendo (NES)", "NES", {".nes", ".zip"}, "/usr/lib/aarch64-linux-gnu/libretro/nestopia_libretro.so");
+                } else if (gameSystems[selected].command == "MISC") {
+                    showRomExplorer("Juegos Variados", "Misc", {".sh", ".elf", ".bin"}, "");
+                }
                 break;
-            }
             case 27:
             case 'q':
-                inGallery = false;
+                inSubmenu = false;
                 break;
         }
     }
 }
 
+// --- MENÚ PRINCIPAL ---
 int main() {
     setlocale(LC_ALL, "");
 
@@ -376,8 +367,7 @@ int main() {
     }
 
     std::vector<MenuItem> menuItems = {
-        {"[GBA]", "Juegos GBA", "SUBMENU_GBA"},
-        {"[NES]", "Juegos NES", "SUBMENU_NES"},
+        {"[PAD]", "Juegos", "SUBMENU_GAMES"},
         {"[MUS]", "Musica", ""},
         {"[VID]", "Videos", "SUBMENU_VIDS"},
         {"[IMG]", "Fotos", "SUBMENU_PICS"},
@@ -435,10 +425,8 @@ int main() {
                     showImageGallery();
                 } else if (menuItems[selected].command == "SUBMENU_VIDS") {
                     showVideoGallery();
-                } else if (menuItems[selected].command == "SUBMENU_GBA") {
-                    showGbaGallery();
-                } else if (menuItems[selected].command == "SUBMENU_NES") {
-                    showNesGallery();
+                } else if (menuItems[selected].command == "SUBMENU_GAMES") {
+                    showGamesMenu();
                 } else if (!menuItems[selected].command.empty()) {
                     runCommand(menuItems[selected].command);
                 }
