@@ -345,11 +345,48 @@ void showGamesMenu() {
     }
 }
 
+// --- FUNCIÓN DE GRABACIÓN INTERACTIVA ---
+void recordVideoInteractive() {
+    clear();
+    attron(COLOR_PAIR(2) | A_BOLD);
+    mvprintw(0, 1, "ABIERTO | Grabando Video");
+    attroff(COLOR_PAIR(2) | A_BOLD);
+
+    mvhline(1, 0, ACS_HLINE, 38);
+    
+    attron(A_BOLD);
+    mvprintw(5, 4, "[ REC ] GRABANDO VIDEO...");
+    attroff(A_BOLD);
+    
+    mvprintw(7, 2, "Presiona cualquier tecla");
+    mvprintw(8, 2, "o [ESC] para Detener");
+
+    mvhline(12, 0, ACS_HLINE, 38);
+    mvprintw(13, 1, "[ESC] Detener y Guardar");
+    refresh();
+
+    // Iniciar ffmpeg en segundo plano guardando el PID en /tmp/ffmpeg_rec.pid
+    std::string startCmd = "ffmpeg -y -f v4l2 -i /dev/video1 ~/Videos/vid-$(date +%H%M%S-%d-%m-%Y).mp4 > /dev/null 2>&1 & echo $! > /tmp/ffmpeg_rec.pid";
+    std::system(startCmd.c_str());
+
+    // Esperar a que el usuario presione una tecla
+    getch();
+
+    // Mandar SIGINT (Ctrl+C) a ffmpeg para que cierre el contenedor mp4 adecuadamente
+    std::system("kill -SIGINT $(cat /tmp/ffmpeg_rec.pid) 2>/dev/null");
+    std::system("rm -f /tmp/ffmpeg_rec.pid");
+
+    clear();
+    mvprintw(6, 4, "Video guardado en ~/Videos");
+    refresh();
+    napms(1200); // Pequeña pausa para feedback visual
+}
+
 // --- SUBMENÚ DE CÁMARA ---
 void showCameraView() {
     std::vector<MenuItem> camOptions = {
         {"[PRE]", "Vista Previa (ffplay)", "VIEW"},
-        {"[REC]", "Grabar Video (10s)", "REC"},
+        {"[REC]", "Grabar Video", "REC"},
         {"[PIC]", "Tomar Foto", "PIC"}
     };
 
@@ -397,9 +434,7 @@ void showCameraView() {
                     std::string cmd = "ffplay -f v4l2 -input_format mjpeg -video_size 640x480 /dev/video1";
                     runCommand(cmd);
                 } else if (camOptions[selected].command == "REC") {
-                    // Guarda con formato: vid-HHMMSS-DD-MM-YYYY.mp4
-                    std::string cmd = "ffmpeg -y -f v4l2 -i /dev/video1 -t 10 ~/Videos/vid-$(date +%H%M%S-%d-%m-%Y).mp4";
-                    runCommand(cmd);
+                    recordVideoInteractive();
                 } else if (camOptions[selected].command == "PIC") {
                     // Guarda con formato: img-HHMMSS-DD-MM-YYYY.jpg
                     std::string cmd = "ffmpeg -y -f v4l2 -i /dev/video1 -vframes 1 ~/Pictures/img-$(date +%H%M%S-%d-%m-%Y).jpg";
