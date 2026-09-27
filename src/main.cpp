@@ -107,7 +107,7 @@ void showImageGallery() {
     }
 }
 
-// Submenú para Videos con mpv
+// Submenú para Videos
 void showVideoGallery() {
     std::string folderPath = std::string(getenv("HOME")) + "/Videos";
     std::vector<std::string> videos;
@@ -178,8 +178,91 @@ void showVideoGallery() {
             case 10:
             case KEY_ENTER: {
                 std::string fullPath = folderPath + "/" + videos[selected];
-                // mpv en TTY directo a pantalla completa sin X11
                 std::string cmd = "mpv --vo=gpu,drm,tesseract --fs \"" + fullPath + "\"";
+                runCommand(cmd);
+                break;
+            }
+            case 27:
+            case 'q':
+                inGallery = false;
+                break;
+        }
+    }
+}
+
+// Submenú para Juegos GBA
+void showGbaGallery() {
+    std::string folderPath = std::string(getenv("HOME")) + "/ROMs/GBA";
+    std::vector<std::string> roms;
+
+    if (fs::exists(folderPath) && fs::is_directory(folderPath)) {
+        for (const auto& entry : fs::directory_iterator(folderPath)) {
+            if (entry.is_regular_file()) {
+                std::string ext = entry.path().extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext == ".gba" || ext == ".zip") {
+                    roms.push_back(entry.path().filename().string());
+                }
+            }
+        }
+    }
+
+    std::sort(roms.begin(), roms.end());
+
+    int selected = 0;
+    bool inGallery = true;
+
+    while (inGallery) {
+        clear();
+
+        attron(COLOR_PAIR(2) | A_BOLD);
+        mvprintw(0, 1, "ABIERTO | Game Boy Advance");
+        attroff(COLOR_PAIR(2) | A_BOLD);
+
+        mvhline(1, 0, ACS_HLINE, 38);
+
+        if (roms.empty()) {
+            mvprintw(3, 2, "No hay ROMs en ~/ROMs/GBA");
+            mvhline(12, 0, ACS_HLINE, 38);
+            mvprintw(13, 1, "[ESC/q] Volver");
+            refresh();
+
+            int ch = getch();
+            if (ch == 27 || ch == 'q') inGallery = false;
+            continue;
+        }
+
+        int startY = 3;
+        for (size_t i = 0; i < roms.size() && i < 8; ++i) {
+            if ((int)i == selected) {
+                attron(COLOR_PAIR(1) | A_BOLD);
+                mvprintw(startY + i, 1, "> %-32s", roms[i].substr(0, 32).c_str());
+                attroff(COLOR_PAIR(1) | A_BOLD);
+            } else {
+                mvprintw(startY + i, 3, "%-32s", roms[i].substr(0, 32).c_str());
+            }
+        }
+
+        mvhline(12, 0, ACS_HLINE, 38);
+        mvprintw(13, 1, "[^v] Navegar  [ENT] Jugar  [ESC] Atras");
+
+        refresh();
+
+        int ch = getch();
+        switch (ch) {
+            case KEY_UP:
+            case 'k':
+                selected = (selected - 1 + (int)roms.size()) % (int)roms.size();
+                break;
+            case KEY_DOWN:
+            case 'j':
+                selected = (selected + 1) % (int)roms.size();
+                break;
+            case 10:
+            case KEY_ENTER: {
+                std::string fullPath = folderPath + "/" + roms[selected];
+                // Lanza X11 rápido solo para mGBA a pantalla completa
+                std::string cmd = "xinit mgba-qt -f \"" + fullPath + "\" -- :0";
                 runCommand(cmd);
                 break;
             }
@@ -211,7 +294,7 @@ int main() {
     }
 
     std::vector<MenuItem> menuItems = {
-        {"[PAD]", "Juegos (GBA, SNES)", ""},
+        {"[GBA]", "Juegos GBA", "SUBMENU_GBA"},
         {"[MUS]", "Musica", ""},
         {"[VID]", "Videos", "SUBMENU_VIDS"},
         {"[IMG]", "Fotos", "SUBMENU_PICS"},
@@ -269,6 +352,8 @@ int main() {
                     showImageGallery();
                 } else if (menuItems[selected].command == "SUBMENU_VIDS") {
                     showVideoGallery();
+                } else if (menuItems[selected].command == "SUBMENU_GBA") {
+                    showGbaGallery();
                 } else if (!menuItems[selected].command.empty()) {
                     runCommand(menuItems[selected].command);
                 }
