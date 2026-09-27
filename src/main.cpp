@@ -268,7 +268,6 @@ void showRomExplorer(const std::string& systemName, const std::string& folderNam
                 if (!corePath.empty()) {
                     cmd = "retroarch -L " + corePath + " -f \"" + fullPath + "\"";
                 } else {
-                    // Para ejecutables de juegos variados/nativos
                     cmd = "\"" + fullPath + "\"";
                 }
                 runCommand(cmd);
@@ -282,7 +281,7 @@ void showRomExplorer(const std::string& systemName, const std::string& folderNam
     }
 }
 
-// --- SUBMENÚ PRINCIPAL DE JUEGOS ---
+// --- SUBMENÚ DE JUEGOS ---
 void showGamesMenu() {
     std::vector<MenuItem> gameSystems = {
         {"[GBA]", "Game Boy Advance", "GBA"},
@@ -346,6 +345,38 @@ void showGamesMenu() {
     }
 }
 
+// --- SUBMENÚ DE CÁMARA ---
+void showCameraView() {
+    bool inCamMenu = true;
+
+    while (inCamMenu) {
+        clear();
+
+        attron(COLOR_PAIR(2) | A_BOLD);
+        mvprintw(0, 1, "ABIERTO | Camara USB");
+        attroff(COLOR_PAIR(2) | A_BOLD);
+
+        mvhline(1, 0, ACS_HLINE, 38);
+        mvprintw(3, 2, "[1] Vista Previa (ffplay)");
+        mvprintw(4, 2, "[2] Grabar Video (10s)");
+        mvhline(12, 0, ACS_HLINE, 38);
+        mvprintw(13, 1, "[1/2] Seleccionar  [ESC] Volver");
+
+        refresh();
+
+        int ch = getch();
+        if (ch == '1') {
+            std::string cmd = "ffplay -f v4l2 -input_format mjpeg -video_size 640x480 /dev/video1";
+            runCommand(cmd);
+        } else if (ch == '2') {
+            std::string cmd = "ffmpeg -y -f v4l2 -i /dev/video1 -t 10 ~/Videos/video_$(date +%Y%m%d_%H%M%S).mp4";
+            runCommand(cmd);
+        } else if (ch == 27 || ch == 'q') {
+            inCamMenu = false;
+        }
+    }
+}
+
 // --- MENÚ PRINCIPAL ---
 int main() {
     setlocale(LC_ALL, "");
@@ -368,6 +399,7 @@ int main() {
 
     std::vector<MenuItem> menuItems = {
         {"[PAD]", "Juegos", "SUBMENU_GAMES"},
+        {"[CAM]", "Camara", "SUBMENU_CAM"},
         {"[MUS]", "Musica", ""},
         {"[VID]", "Videos", "SUBMENU_VIDS"},
         {"[IMG]", "Fotos", "SUBMENU_PICS"},
@@ -427,6 +459,8 @@ int main() {
                     showVideoGallery();
                 } else if (menuItems[selected].command == "SUBMENU_GAMES") {
                     showGamesMenu();
+                } else if (menuItems[selected].command == "SUBMENU_CAM") {
+                    showCameraView();
                 } else if (!menuItems[selected].command.empty()) {
                     runCommand(menuItems[selected].command);
                 }
