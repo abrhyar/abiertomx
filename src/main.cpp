@@ -24,12 +24,11 @@ void runCommand(const std::string& cmd) {
     curs_set(0);
 }
 
-// Submenú para seleccionar y ver imágenes específicas
+// Submenú para Imágenes
 void showImageGallery() {
     std::string folderPath = std::string(getenv("HOME")) + "/Pictures";
     std::vector<std::string> images;
 
-    // Escanear la carpeta ~/Pictures buscando archivos de imagen
     if (fs::exists(folderPath) && fs::is_directory(folderPath)) {
         for (const auto& entry : fs::directory_iterator(folderPath)) {
             if (entry.is_regular_file()) {
@@ -50,7 +49,6 @@ void showImageGallery() {
     while (inGallery) {
         clear();
 
-        // Header
         attron(COLOR_PAIR(2) | A_BOLD);
         mvprintw(0, 1, "ABIERTO | Galeria de Fotos");
         attroff(COLOR_PAIR(2) | A_BOLD);
@@ -68,9 +66,8 @@ void showImageGallery() {
             continue;
         }
 
-        // Listar imágenes
         int startY = 3;
-        for (size_t i = 0; i < images.size() && i < 8; ++i) { // Limitar a lo que entra en pantalla
+        for (size_t i = 0; i < images.size() && i < 8; ++i) {
             if ((int)i == selected) {
                 attron(COLOR_PAIR(1) | A_BOLD);
                 mvprintw(startY + i, 1, "> %-32s", images[i].substr(0, 32).c_str());
@@ -80,7 +77,6 @@ void showImageGallery() {
             }
         }
 
-        // Footer
         mvhline(12, 0, ACS_HLINE, 38);
         mvprintw(13, 1, "[^v] Navegar  [ENT] Ver  [ESC] Atras");
 
@@ -98,13 +94,96 @@ void showImageGallery() {
                 break;
             case 10:
             case KEY_ENTER: {
-                // Abrir solo la imagen seleccionada con fim
                 std::string fullPath = folderPath + "/" + images[selected];
                 std::string cmd = "fim -a \"" + fullPath + "\"";
                 runCommand(cmd);
                 break;
             }
-            case 27: // ESC
+            case 27:
+            case 'q':
+                inGallery = false;
+                break;
+        }
+    }
+}
+
+// Submenú para Videos con mpv
+void showVideoGallery() {
+    std::string folderPath = std::string(getenv("HOME")) + "/Videos";
+    std::vector<std::string> videos;
+
+    if (fs::exists(folderPath) && fs::is_directory(folderPath)) {
+        for (const auto& entry : fs::directory_iterator(folderPath)) {
+            if (entry.is_regular_file()) {
+                std::string ext = entry.path().extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext == ".mp4" || ext == ".mkv" || ext == ".avi" || ext == ".mov" || ext == ".webm") {
+                    videos.push_back(entry.path().filename().string());
+                }
+            }
+        }
+    }
+
+    std::sort(videos.begin(), videos.end());
+
+    int selected = 0;
+    bool inGallery = true;
+
+    while (inGallery) {
+        clear();
+
+        attron(COLOR_PAIR(2) | A_BOLD);
+        mvprintw(0, 1, "ABIERTO | Reproductor de Video");
+        attroff(COLOR_PAIR(2) | A_BOLD);
+
+        mvhline(1, 0, ACS_HLINE, 38);
+
+        if (videos.empty()) {
+            mvprintw(3, 2, "No hay videos en ~/Videos");
+            mvhline(12, 0, ACS_HLINE, 38);
+            mvprintw(13, 1, "[ESC/q] Volver");
+            refresh();
+
+            int ch = getch();
+            if (ch == 27 || ch == 'q') inGallery = false;
+            continue;
+        }
+
+        int startY = 3;
+        for (size_t i = 0; i < videos.size() && i < 8; ++i) {
+            if ((int)i == selected) {
+                attron(COLOR_PAIR(1) | A_BOLD);
+                mvprintw(startY + i, 1, "> %-32s", videos[i].substr(0, 32).c_str());
+                attroff(COLOR_PAIR(1) | A_BOLD);
+            } else {
+                mvprintw(startY + i, 3, "%-32s", videos[i].substr(0, 32).c_str());
+            }
+        }
+
+        mvhline(12, 0, ACS_HLINE, 38);
+        mvprintw(13, 1, "[^v] Navegar  [ENT] Ver  [ESC] Atras");
+
+        refresh();
+
+        int ch = getch();
+        switch (ch) {
+            case KEY_UP:
+            case 'k':
+                selected = (selected - 1 + (int)videos.size()) % (int)videos.size();
+                break;
+            case KEY_DOWN:
+            case 'j':
+                selected = (selected + 1) % (int)videos.size();
+                break;
+            case 10:
+            case KEY_ENTER: {
+                std::string fullPath = folderPath + "/" + videos[selected];
+                // mpv en TTY directo a pantalla completa sin X11
+                std::string cmd = "mpv --vo=gpu,drm,tesseract --fs \"" + fullPath + "\"";
+                runCommand(cmd);
+                break;
+            }
+            case 27:
             case 'q':
                 inGallery = false;
                 break;
@@ -134,8 +213,8 @@ int main() {
     std::vector<MenuItem> menuItems = {
         {"[PAD]", "Juegos (GBA, SNES)", ""},
         {"[MUS]", "Musica", ""},
-        {"[VID]", "Videos", ""},
-        {"[IMG]", "Fotos", "SUBMENU_PICS"}, // Acción especial para abrir el submenú
+        {"[VID]", "Videos", "SUBMENU_VIDS"},
+        {"[IMG]", "Fotos", "SUBMENU_PICS"},
         {"[CFG]", "Configuracion", "sudo armbian-config"},
         {"[OFF]", "Salir", "EXIT"}
     };
@@ -146,7 +225,6 @@ int main() {
     while (running) {
         clear();
 
-        // Header
         attron(COLOR_PAIR(2) | A_BOLD);
         mvprintw(0, 1, "ABIERTO v0.1 | ALk");
         attroff(COLOR_PAIR(2) | A_BOLD);
@@ -157,7 +235,6 @@ int main() {
 
         mvhline(1, 0, ACS_HLINE, 38);
 
-        // Menú Principal
         int startY = 3;
         for (size_t i = 0; i < menuItems.size(); ++i) {
             if ((int)i == selected) {
@@ -169,7 +246,6 @@ int main() {
             }
         }
 
-        // Footer
         mvhline(12, 0, ACS_HLINE, 38);
         mvprintw(13, 1, "[^v] Navegar   [ENTER] Entrar");
 
@@ -191,6 +267,8 @@ int main() {
                     running = false;
                 } else if (menuItems[selected].command == "SUBMENU_PICS") {
                     showImageGallery();
+                } else if (menuItems[selected].command == "SUBMENU_VIDS") {
+                    showVideoGallery();
                 } else if (!menuItems[selected].command.empty()) {
                     runCommand(menuItems[selected].command);
                 }
