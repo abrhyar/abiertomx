@@ -1,7 +1,4 @@
 #include "utils.hpp"
-#include "games.hpp"
-#include "camera.hpp"
-#include "gallery.hpp"
 #include <ncurses.h>
 #include <cstdlib>
 
