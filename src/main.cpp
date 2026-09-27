@@ -14,7 +14,7 @@ struct MenuItem {
 void runCommand(const std::string& cmd) {
     if (cmd.empty()) return;
     
-    // Pausar NCurses para dejar la TTY limpia a la sub-aplicacion
+    // Pausar NCurses para dejar la TTY limpia
     endwin();
     std::system(cmd.c_str());
     
@@ -29,7 +29,7 @@ int main() {
     initscr();
     cbreak();
     noecho();
-    keypad(stdscr, TRUE); // Captura correcta de flechas en TTY
+    keypad(stdscr, TRUE);
     curs_set(0);
 
     if (has_colors()) {
@@ -46,7 +46,8 @@ int main() {
         {"[PAD]", "Juegos (GBA, SNES)", ""},
         {"[MUS]", "Musica", ""},
         {"[VID]", "Videos", ""},
-        {"[IMG]", "Fotos", ""},
+        // Abre todas las imágenes dentro de ~/Pictures de forma automática con auto-escala
+        {"[IMG]", "Fotos", "fim -a ~/Pictures/"},
         {"[CFG]", "Configuracion", "sudo armbian-config"},
         {"[OFF]", "Salir", "EXIT"}
     };
@@ -96,7 +97,7 @@ int main() {
             case 'j':
                 selected = (selected + 1) % (int)menuItems.size();
                 break;
-            case 10: // Enter
+            case 10:
             case KEY_ENTER:
                 if (menuItems[selected].command == "EXIT") {
                     running = false;
