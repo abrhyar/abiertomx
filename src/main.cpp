@@ -347,6 +347,13 @@ void showGamesMenu() {
 
 // --- SUBMENÚ DE CÁMARA ---
 void showCameraView() {
+    std::vector<MenuItem> camOptions = {
+        {"[PRE]", "Vista Previa (ffplay)", "VIEW"},
+        {"[REC]", "Grabar Video (10s)", "REC"},
+        {"[PIC]", "Tomar Foto", "PIC"}
+    };
+
+    int selected = 0;
     bool inCamMenu = true;
 
     while (inCamMenu) {
@@ -357,22 +364,52 @@ void showCameraView() {
         attroff(COLOR_PAIR(2) | A_BOLD);
 
         mvhline(1, 0, ACS_HLINE, 38);
-        mvprintw(3, 2, "[1] Vista Previa (ffplay)");
-        mvprintw(4, 2, "[2] Grabar Video (10s)");
+
+        int startY = 3;
+        for (size_t i = 0; i < camOptions.size(); ++i) {
+            if ((int)i == selected) {
+                attron(COLOR_PAIR(1) | A_BOLD);
+                mvprintw(startY + i, 1, "> %-5s %-26s", camOptions[i].tag.c_str(), camOptions[i].title.c_str());
+                attroff(COLOR_PAIR(1) | A_BOLD);
+            } else {
+                mvprintw(startY + i, 3, "%-5s %s", camOptions[i].tag.c_str(), camOptions[i].title.c_str());
+            }
+        }
+
         mvhline(12, 0, ACS_HLINE, 38);
-        mvprintw(13, 1, "[1/2] Seleccionar  [ESC] Volver");
+        mvprintw(13, 1, "[^v] Navegar  [ENT] Ejecutar  [ESC] Atras");
 
         refresh();
 
         int ch = getch();
-        if (ch == '1') {
-            std::string cmd = "ffplay -f v4l2 -input_format mjpeg -video_size 640x480 /dev/video1";
-            runCommand(cmd);
-        } else if (ch == '2') {
-            std::string cmd = "ffmpeg -y -f v4l2 -i /dev/video1 -t 10 ~/Videos/video_$(date +%Y%m%d_%H%M%S).mp4";
-            runCommand(cmd);
-        } else if (ch == 27 || ch == 'q') {
-            inCamMenu = false;
+        switch (ch) {
+            case KEY_UP:
+            case 'k':
+                selected = (selected - 1 + (int)camOptions.size()) % (int)camOptions.size();
+                break;
+            case KEY_DOWN:
+            case 'j':
+                selected = (selected + 1) % (int)camOptions.size();
+                break;
+            case 10:
+            case KEY_ENTER:
+                if (camOptions[selected].command == "VIEW") {
+                    std::string cmd = "ffplay -f v4l2 -input_format mjpeg -video_size 640x480 /dev/video1";
+                    runCommand(cmd);
+                } else if (camOptions[selected].command == "REC") {
+                    // Guarda con formato: vid-HHMMSS-DD-MM-YYYY.mp4
+                    std::string cmd = "ffmpeg -y -f v4l2 -i /dev/video1 -t 10 ~/Videos/vid-$(date +%H%M%S-%d-%m-%Y).mp4";
+                    runCommand(cmd);
+                } else if (camOptions[selected].command == "PIC") {
+                    // Guarda con formato: img-HHMMSS-DD-MM-YYYY.jpg
+                    std::string cmd = "ffmpeg -y -f v4l2 -i /dev/video1 -vframes 1 ~/Pictures/img-$(date +%H%M%S-%d-%m-%Y).jpg";
+                    runCommand(cmd);
+                }
+                break;
+            case 27:
+            case 'q':
+                inCamMenu = false;
+                break;
         }
     }
 }
