@@ -44,16 +44,16 @@ int main() {
     int selected = 0;
     bool running = true;
 
-    // Control de lectura de temperatura cada 30 segundos
+    // Control de lectura de temperatura
     std::string currentTemp = getCPUTemp();
     auto lastTempCheck = std::chrono::steady_clock::now();
 
     while (running) {
         clear();
 
-        // Actualizar temperatura solo si transcurrieron 30 segundos
+        // Actualizar temperatura solo si transcurrieron 10 segundos
         auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - lastTempCheck).count() >= 30) {
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - lastTempCheck).count() >= 10) {
             currentTemp = getCPUTemp();
             lastTempCheck = now;
         }
