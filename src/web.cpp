@@ -51,7 +51,7 @@ void showWebMenu() {
             case 10:
             case KEY_ENTER:
                 if (webOptions[selected].command == "THORIUM") {
-                    std::string cmd = "xinit /usr/bin/thorium-browser "
+                    std::string cmd = "sudo xinit /usr/bin/thorium-browser "
                                       "--kiosk --no-sandbox --ignore-gpu-blocklist "
                                       "--enable-gpu-rasterization --enable-zero-copy --use-gl=egl "
                                       "--enable-features=VaapiVideoDecoder,CanvasOopRasterization "
@@ -59,7 +59,7 @@ void showWebMenu() {
                                       "\"https://google.com\" -- :0";
                     runCommand(cmd);
                 } else if (webOptions[selected].command == "YOUTUBE") {
-                    std::string cmd = "xinit /usr/bin/thorium-browser "
+                    std::string cmd = "sudo xinit /usr/bin/thorium-browser "
                                       "--kiosk --no-sandbox --ignore-gpu-blocklist "
                                       "--enable-gpu-rasterization --enable-zero-copy --use-gl=egl "
                                       "--enable-features=VaapiVideoDecoder,CanvasOopRasterization "
