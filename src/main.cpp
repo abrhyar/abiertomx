@@ -8,6 +8,7 @@
 #include "games.hpp"
 #include "camera.hpp"
 #include "gallery.hpp"
+#include "web.hpp" // <-- Agregado
 
 int main() {
     setlocale(LC_ALL, "");
@@ -30,6 +31,7 @@ int main() {
 
     std::vector<MenuItem> menuItems = {
         {"[PAD]", "Juegos", "SUBMENU_GAMES"},
+        {"[WEB]", "Web", "SUBMENU_WEB"}, // <-- Nueva sección agregada
         {"[CAM]", "Camara", "SUBMENU_CAM"},
         {"[MUS]", "Musica", ""},
         {"[VID]", "Videos", "SUBMENU_VIDS"},
@@ -92,6 +94,8 @@ int main() {
                     showGamesMenu();
                 } else if (menuItems[selected].command == "SUBMENU_CAM") {
                     showCameraView();
+                } else if (menuItems[selected].command == "SUBMENU_WEB") {
+                    showWebMenu(); // <-- Llamada a la nueva sección
                 } else if (!menuItems[selected].command.empty()) {
                     runCommand(menuItems[selected].command);
                 }
