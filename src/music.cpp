@@ -11,6 +11,7 @@
 
 namespace fs = std::filesystem;
 
+// Extraer metadatos de letras o descripción limpiando líneas vacías
 std::vector<std::string> getLyrics(const std::string& mp3Path) {
     std::string cmd = "ffprobe -v error -show_entries format_tags=lyrics:format_tags=USLT:format_tags=LYRICS:format_tags=description:format_tags=comment -of default=noprint_wrappers=1:nokey=1 \"" + mp3Path + "\" > /tmp/lyrics.txt 2>/dev/null";
     std::system(cmd.c_str());
@@ -19,16 +20,20 @@ std::vector<std::string> getLyrics(const std::string& mp3Path) {
     std::ifstream file("/tmp/lyrics.txt");
     std::string line;
     while (std::getline(file, line)) {
-        if (!line.empty()) lines.push_back(line);
+        // Ignorar líneas vacías o links de Youtube para ir directo a la letra
+        if (!line.empty() && line.find("http") == std::string::npos && line.find("Taken from") == std::string::npos) {
+            lines.push_back(line);
+        }
     }
     file.close();
 
     if (lines.empty()) {
-        lines.push_back("Sin letra encontrada.");
+        lines.push_back("Sin letra disponible en tags.");
     }
     return lines;
 }
 
+// Extraer portada y convertir a bloques ANSI limpios
 std::vector<std::string> getCoverArtANSI(const std::string& mp3Path, int width, int height) {
     std::string extractCmd = "ffmpeg -y -i \"" + mp3Path + "\" -an -vcodec copy /tmp/cover.jpg > /dev/null 2>&1";
     std::system(extractCmd.c_str());
@@ -72,6 +77,7 @@ void showMusicPlayer() {
     bool isShuffle = false;
 
     std::vector<std::string> currentLyrics;
+    std::vector<std::string> currentCover;
 
     while (inPlayer) {
         clear();
@@ -80,11 +86,11 @@ void showMusicPlayer() {
         mvprintw(0, 1, "ABIERTO | Reproductor de Musica");
         attroff(COLOR_PAIR(2) | A_BOLD);
 
-        mvhline(1, 0, ACS_HLINE, 60);
+        mvhline(1, 0, ACS_HLINE, 65);
 
         if (tracks.empty()) {
             mvprintw(3, 2, "No hay musica en ~/Music");
-            mvhline(12, 0, ACS_HLINE, 60);
+            mvhline(12, 0, ACS_HLINE, 65);
             mvprintw(13, 1, "[ESC/q] Volver");
             refresh();
             int ch = getch();
@@ -92,33 +98,41 @@ void showMusicPlayer() {
             continue;
         }
 
-        // 1. Cuadro de Portada
+        // 1. Cuadro de Portada (Arriba Izquierda)
         mvprintw(2, 1, "+--- PORTADA ---+");
-        
-        // 2. Cuadro de Lista de Pistas
+        if (!currentCover.empty()) {
+            for (size_t i = 0; i < currentCover.size() && i < 5; ++i) {
+                mvprintw(3 + i, 2, "%s", currentCover[i].c_str());
+            }
+        } else {
+            mvprintw(5, 4, "[ SIN PORTADA ]");
+        }
+
+        // 2. Cuadro de Lista de Pistas (Derecha)
         mvprintw(2, 22, "+--- PISTAS EN ~/Music ---+");
         int startY = 3;
-        for (size_t i = 0; i < tracks.size() && i < 6; ++i) {
+        for (size_t i = 0; i < tracks.size() && i < 5; ++i) {
             if ((int)i == selected) {
                 attron(COLOR_PAIR(1) | A_BOLD);
-                mvprintw(startY + i, 22, "> %-30s", tracks[i].substr(0, 30).c_str());
+                mvprintw(startY + i, 22, "> %-35s", tracks[i].substr(0, 35).c_str());
                 attroff(COLOR_PAIR(1) | A_BOLD);
             } else {
-                mvprintw(startY + i, 24, "%-30s", tracks[i].substr(0, 30).c_str());
+                mvprintw(startY + i, 24, "%-35s", tracks[i].substr(0, 35).c_str());
             }
         }
 
-        // 3. Cuadro de Letras
-        mvprintw(9, 1, "+--- LETRAS ---+");
-        for (size_t i = 0; i < currentLyrics.size() && i < 3; ++i) {
-            mvprintw(10 + i, 2, "%.18s", currentLyrics[i].c_str());
+        // 3. Cuadro de Letras (Abajo)
+        mvprintw(8, 1, "+--- LETRAS / METADATOS ---+");
+        for (size_t i = 0; i < currentLyrics.size() && i < 4; ++i) {
+            // Ampliamos el ancho de impresión a 60 caracteres
+            mvprintw(9 + i, 2, "%.60s", currentLyrics[i].c_str());
         }
 
-        // 4. Barra de Estado
-        mvhline(13, 0, ACS_HLINE, 60);
+        // 4. Barra de Estado de Reproducción
+        mvhline(13, 0, ACS_HLINE, 65);
         std::string statusStr = isPlaying ? "[PLAYING]" : "[PAUSED]";
         std::string shufStr = isShuffle ? "[SHUF:ON]" : "[SHUF:OFF]";
-        mvprintw(14, 1, "%s  %s  [ENT] Play  [S] Aleatorio  [ESC] Salir", statusStr.c_str(), shufStr.c_str());
+        mvprintw(14, 1, "%s  %s  [ENT] Play  [S] Random  [ESC] Atras", statusStr.c_str(), shufStr.c_str());
 
         refresh();
 
@@ -140,16 +154,11 @@ void showMusicPlayer() {
             case KEY_ENTER: {
                 std::string fullPath = folderPath + "/" + tracks[selected];
                 
-                // Extraer letras
+                // Extraer y guardar letras y portada en variables persistentes
                 currentLyrics = getLyrics(fullPath);
+                currentCover = getCoverArtANSI(fullPath, 18, 5);
 
-                // Dibujar portada con Chafa
-                std::vector<std::string> cover = getCoverArtANSI(fullPath, 18, 5);
-                for (size_t i = 0; i < cover.size() && i < 5; ++i) {
-                    mvprintw(3 + i, 2, "%s", cover[i].c_str());
-                }
-
-                // Reproducir de fondo
+                // Iniciar audio con MPV de fondo
                 std::string playCmd = "killall mpv >/dev/null 2>&1; mpv --no-video --no-terminal \"" + fullPath + "\" &";
                 std::system(playCmd.c_str());
                 isPlaying = true;
