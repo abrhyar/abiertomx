@@ -11,9 +11,8 @@
 
 namespace fs = std::filesystem;
 
-// Función para extraer letra incrustada del MP3
 std::vector<std::string> getLyrics(const std::string& mp3Path) {
-    std::string cmd = "ffprobe -v error -show_entries format_tags=lyrics:format_tags=USLT:format_tags=LYRICS -of default=noprint_wrappers=1:nokey=1 \"" + mp3Path + "\" > /tmp/lyrics.txt 2>/dev/null";
+    std::string cmd = "ffprobe -v error -show_entries format_tags=lyrics:format_tags=USLT:format_tags=LYRICS:format_tags=description:format_tags=comment -of default=noprint_wrappers=1:nokey=1 \"" + mp3Path + "\" > /tmp/lyrics.txt 2>/dev/null";
     std::system(cmd.c_str());
 
     std::vector<std::string> lines;
@@ -25,20 +24,17 @@ std::vector<std::string> getLyrics(const std::string& mp3Path) {
     file.close();
 
     if (lines.empty()) {
-        lines.push_back("Sin letra incrustada en el MP3.");
+        lines.push_back("Sin letra encontrada.");
     }
     return lines;
 }
 
-// Función para generar la portada ASCII con chafa
 std::vector<std::string> getCoverArtANSI(const std::string& mp3Path, int width, int height) {
-    // 1. Extraer portada a /tmp/cover.jpg
     std::string extractCmd = "ffmpeg -y -i \"" + mp3Path + "\" -an -vcodec copy /tmp/cover.jpg > /dev/null 2>&1";
     std::system(extractCmd.c_str());
 
-    // 2. Renderizar con chafa a texto ANSI
     std::ostringstream chafaCmd;
-    chafaCmd << "chafa --size=" << width << "x" << height << " --colors=full /tmp/cover.jpg > /tmp/cover.txt 2>/dev/null";
+    chafaCmd << "chafa --size=" << width << "x" << height << " --symbols=block /tmp/cover.jpg > /tmp/cover.txt 2>/dev/null";
     std::system(chafaCmd.str().c_str());
 
     std::vector<std::string> ansiLines;
@@ -76,7 +72,6 @@ void showMusicPlayer() {
     bool isShuffle = false;
 
     std::vector<std::string> currentLyrics;
-    std::string currentTrackName = "";
 
     while (inPlayer) {
         clear();
@@ -97,11 +92,10 @@ void showMusicPlayer() {
             continue;
         }
 
-        // Cajas/Marcos (Estilo maqueta dibujada)
-        // 1. Cuadro de Portada (Arriba Izquierda)
+        // 1. Cuadro de Portada
         mvprintw(2, 1, "+--- PORTADA ---+");
         
-        // 2. Cuadro de Lista de Pistas (Derecha)
+        // 2. Cuadro de Lista de Pistas
         mvprintw(2, 22, "+--- PISTAS EN ~/Music ---+");
         int startY = 3;
         for (size_t i = 0; i < tracks.size() && i < 6; ++i) {
@@ -114,17 +108,17 @@ void showMusicPlayer() {
             }
         }
 
-        // 3. Cuadro de Letras (Abajo Izquierda)
+        // 3. Cuadro de Letras
         mvprintw(9, 1, "+--- LETRAS ---+");
         for (size_t i = 0; i < currentLyrics.size() && i < 3; ++i) {
             mvprintw(10 + i, 2, "%.18s", currentLyrics[i].c_str());
         }
 
-        // 4. Barra de Controles e Info de Reproducción (Abajo)
+        // 4. Barra de Estado
         mvhline(13, 0, ACS_HLINE, 60);
         std::string statusStr = isPlaying ? "[PLAYING]" : "[PAUSED]";
         std::string shufStr = isShuffle ? "[SHUF:ON]" : "[SHUF:OFF]";
-        mvprintw(14, 1, "%s  %s  [ENT] Reproducir  [S] Aleatorio  [ESC] Salir", statusStr.c_str(), shufStr.c_str());
+        mvprintw(14, 1, "%s  %s  [ENT] Play  [S] Aleatorio  [ESC] Salir", statusStr.c_str(), shufStr.c_str());
 
         refresh();
 
@@ -145,18 +139,17 @@ void showMusicPlayer() {
             case 10:
             case KEY_ENTER: {
                 std::string fullPath = folderPath + "/" + tracks[selected];
-                currentTrackName = tracks[selected];
                 
-                // Extraer Letras
+                // Extraer letras
                 currentLyrics = getLyrics(fullPath);
 
-                // Renderizar Portada con Chafa
+                // Dibujar portada con Chafa
                 std::vector<std::string> cover = getCoverArtANSI(fullPath, 18, 5);
                 for (size_t i = 0; i < cover.size() && i < 5; ++i) {
                     mvprintw(3 + i, 2, "%s", cover[i].c_str());
                 }
 
-                // Iniciar reproductor mpv en segundo plano
+                // Reproducir de fondo
                 std::string playCmd = "killall mpv >/dev/null 2>&1; mpv --no-video --no-terminal \"" + fullPath + "\" &";
                 std::system(playCmd.c_str());
                 isPlaying = true;

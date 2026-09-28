@@ -10,6 +10,7 @@
 #include "camera.hpp"
 #include "gallery.hpp"
 #include "web.hpp"
+#include "music.hpp"
 
 int main() {
     setlocale(LC_ALL, "");
@@ -34,7 +35,7 @@ int main() {
         {"[PAD]", "Juegos", "SUBMENU_GAMES"},
         {"[WEB]", "Web", "SUBMENU_WEB"},
         {"[CAM]", "Camara", "SUBMENU_CAM"},
-        {"[MUS]", "Musica", ""},
+        {"[MUS]", "Musica", "SUBMENU_MUS"},
         {"[VID]", "Videos", "SUBMENU_VIDS"},
         {"[IMG]", "Fotos", "SUBMENU_PICS"},
         {"[CFG]", "Configuracion", "sudo armbian-config"},
@@ -111,6 +112,8 @@ int main() {
                     showCameraView();
                 } else if (menuItems[selected].command == "SUBMENU_WEB") {
                     showWebMenu();
+                } else if (menuItems[selected].command == "SUBMENU_MUS") {
+                    showMusicPlayer();
                 } else if (!menuItems[selected].command.empty()) {
                     runCommand(menuItems[selected].command);
                 }
