@@ -8,38 +8,86 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <chrono>
+#include <thread>
+#include <regex>
 
 namespace fs = std::filesystem;
 
-// Extraer metadatos de letras o descripción limpiando líneas vacías
-std::vector<std::string> getLyrics(const std::string& mp3Path) {
+struct LyricLine {
+    double timestamp; // En segundos
+    std::string text;
+};
+
+// Obtener la duración total de la canción en segundos mediante ffprobe
+double getAudioDuration(const std::string& mp3Path) {
+    std::string cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"" + mp3Path + "\" > /tmp/duration.txt 2>/dev/null";
+    std::system(cmd.c_str());
+    std::ifstream file("/tmp/duration.txt");
+    double duration = 0.0;
+    if (file >> duration) {
+        file.close();
+        return duration;
+    }
+    file.close();
+    return 180.0; // Valor por defecto (3 min) si no se detecta
+}
+
+// Extraer letras y detectar si vienen sincronizadas con marcas de tiempo [mm:ss.xx]
+std::vector<LyricLine> getLyricsWithTimestamps(const std::string& mp3Path, double totalDuration, bool& isSynced) {
     std::string cmd = "ffprobe -v error -show_entries format_tags=lyrics:format_tags=USLT:format_tags=LYRICS:format_tags=description:format_tags=comment -of default=noprint_wrappers=1:nokey=1 \"" + mp3Path + "\" > /tmp/lyrics.txt 2>/dev/null";
     std::system(cmd.c_str());
 
-    std::vector<std::string> lines;
+    std::vector<LyricLine> result;
     std::ifstream file("/tmp/lyrics.txt");
     std::string line;
+    std::vector<std::string> rawLines;
+
+    std::regex timeRegex(R"(\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\]\s*(.*))");
+
     while (std::getline(file, line)) {
-        // Ignorar líneas vacías o links de Youtube para ir directo a la letra
-        if (!line.empty() && line.find("http") == std::string::npos && line.find("Taken from") == std::string::npos) {
-            lines.push_back(line);
+        if (line.empty() || line.find("http") != std::string::npos || line.find("Taken from") != std::string::npos) {
+            continue;
         }
+        rawLines.push_back(line);
     }
     file.close();
 
-    if (lines.empty()) {
-        lines.push_back("Sin letra disponible en tags.");
+    isSynced = false;
+    for (const auto& l : rawLines) {
+        std::smatch match;
+        if (std::regex_match(l, match, timeRegex)) {
+            isSynced = true;
+            double mins = std::stod(match[1].str());
+            double secs = std::stod(match[2].str());
+            double ms = match[3].matched ? std::stod(match[3].str()) / 100.0 : 0.0;
+            double totalSecs = mins * 60.0 + secs + ms;
+            result.push_back({totalSecs, match[4].str()});
+        }
     }
-    return lines;
+
+    // Si no tiene tiempos [mm:ss], distribuir el texto uniformemente según la duración
+    if (!isSynced && !rawLines.empty()) {
+        double step = totalDuration / static_cast<double>(rawLines.size());
+        for (size_t i = 0; i < rawLines.size(); ++i) {
+            result.push_back({i * step, rawLines[i]});
+        }
+    }
+
+    if (result.empty()) {
+        result.push_back({0.0, "Sin letra disponible para esta pista."});
+    }
+
+    return result;
 }
 
-// Extraer portada y convertir a bloques ANSI limpios
+// Extraer portada limpia sin secuencias TrueColor de 24-bit
 std::vector<std::string> getCoverArtANSI(const std::string& mp3Path, int width, int height) {
     std::string extractCmd = "ffmpeg -y -i \"" + mp3Path + "\" -an -vcodec copy /tmp/cover.jpg > /dev/null 2>&1";
     std::system(extractCmd.c_str());
 
     std::ostringstream chafaCmd;
-    chafaCmd << "chafa --size=" << width << "x" << height << " --symbols=block /tmp/cover.jpg > /tmp/cover.txt 2>/dev/null";
+    chafaCmd << "chafa --size=" << width << "x" << height << " --colors=16 --symbols=block /tmp/cover.jpg > /tmp/cover.txt 2>/dev/null";
     std::system(chafaCmd.str().c_str());
 
     std::vector<std::string> ansiLines;
@@ -75,9 +123,16 @@ void showMusicPlayer() {
     bool inPlayer = true;
     bool isPlaying = false;
     bool isShuffle = false;
+    bool isSyncedLyrics = false;
 
-    std::vector<std::string> currentLyrics;
+    std::vector<LyricLine> currentLyrics;
     std::vector<std::string> currentCover;
+
+    auto startTime = std::chrono::steady_clock::now();
+    double songDuration = 0.0;
+
+    // Hacer getch() no bloqueante para refrescar letras en tiempo real
+    nodelay(stdscr, TRUE);
 
     while (inPlayer) {
         clear();
@@ -95,6 +150,7 @@ void showMusicPlayer() {
             refresh();
             int ch = getch();
             if (ch == 27 || ch == 'q') inPlayer = false;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
 
@@ -102,7 +158,7 @@ void showMusicPlayer() {
         mvprintw(2, 1, "+--- PORTADA ---+");
         if (!currentCover.empty()) {
             for (size_t i = 0; i < currentCover.size() && i < 5; ++i) {
-                mvprintw(3 + i, 2, "%s", currentCover[i].c_str());
+                mvprintw(3 + i, 2, "%.18s", currentCover[i].c_str());
             }
         } else {
             mvprintw(5, 4, "[ SIN PORTADA ]");
@@ -121,53 +177,86 @@ void showMusicPlayer() {
             }
         }
 
-        // 3. Cuadro de Letras (Abajo)
-        mvprintw(8, 1, "+--- LETRAS / METADATOS ---+");
-        for (size_t i = 0; i < currentLyrics.size() && i < 4; ++i) {
-            // Ampliamos el ancho de impresión a 60 caracteres
-            mvprintw(9 + i, 2, "%.60s", currentLyrics[i].c_str());
+        // 3. Calculador de Letras y Desplazamiento Automático
+        mvprintw(8, 1, "+--- LETRAS (AUTOSCROLL) ---+");
+        
+        size_t currentLineIdx = 0;
+        if (isPlaying && !currentLyrics.empty()) {
+            auto now = std::chrono::steady_clock::now();
+            double elapsed = std::chrono::duration<double>(now - startTime).count();
+
+            for (size_t i = 0; i < currentLyrics.size(); ++i) {
+                if (elapsed >= currentLyrics[i].timestamp) {
+                    currentLineIdx = i;
+                } else {
+                    break;
+                }
+            }
         }
 
-        // 4. Barra de Estado de Reproducción
+        // Mostrar 4 líneas a partir de la línea actual
+        for (size_t i = 0; i < 4; ++i) {
+            size_t targetIdx = currentLineIdx + i;
+            if (targetIdx < currentLyrics.size()) {
+                if (i == 0 && isPlaying) {
+                    attron(A_BOLD | COLOR_PAIR(3));
+                    mvprintw(9 + i, 2, "> %.58s", currentLyrics[targetIdx].text.c_str());
+                    attroff(A_BOLD | COLOR_PAIR(3));
+                } else {
+                    mvprintw(9 + i, 4, "%.58s", currentLyrics[targetIdx].text.c_str());
+                }
+            }
+        }
+
+        // 4. Barra de Estado
         mvhline(13, 0, ACS_HLINE, 65);
         std::string statusStr = isPlaying ? "[PLAYING]" : "[PAUSED]";
-        std::string shufStr = isShuffle ? "[SHUF:ON]" : "[SHUF:OFF]";
-        mvprintw(14, 1, "%s  %s  [ENT] Play  [S] Random  [ESC] Atras", statusStr.c_str(), shufStr.c_str());
+        std::string modeStr = isSyncedLyrics ? "[LRC:SYNC]" : "[LRC:AUTO]";
+        mvprintw(14, 1, "%s %s [ENT] Play  [S] Random  [ESC] Atras", statusStr.c_str(), modeStr.c_str());
 
         refresh();
 
         int ch = getch();
-        switch (ch) {
-            case KEY_UP:
-            case 'k':
-                selected = (selected - 1 + (int)tracks.size()) % (int)tracks.size();
-                break;
-            case KEY_DOWN:
-            case 'j':
-                selected = (selected + 1) % (int)tracks.size();
-                break;
-            case 's':
-            case 'S':
-                isShuffle = !isShuffle;
-                break;
-            case 10:
-            case KEY_ENTER: {
-                std::string fullPath = folderPath + "/" + tracks[selected];
-                
-                // Extraer y guardar letras y portada en variables persistentes
-                currentLyrics = getLyrics(fullPath);
-                currentCover = getCoverArtANSI(fullPath, 18, 5);
+        if (ch != ERR) {
+            switch (ch) {
+                case KEY_UP:
+                case 'k':
+                    selected = (selected - 1 + (int)tracks.size()) % (int)tracks.size();
+                    break;
+                case KEY_DOWN:
+                case 'j':
+                    selected = (selected + 1) % (int)tracks.size();
+                    break;
+                case 's':
+                case 'S':
+                    isShuffle = !isShuffle;
+                    break;
+                case 10:
+                case KEY_ENTER: {
+                    std::string fullPath = folderPath + "/" + tracks[selected];
+                    
+                    songDuration = getAudioDuration(fullPath);
+                    currentLyrics = getLyricsWithTimestamps(fullPath, songDuration, isSyncedLyrics);
+                    currentCover = getCoverArtANSI(fullPath, 18, 5);
 
-                // Iniciar audio con MPV de fondo
-                std::string playCmd = "killall mpv >/dev/null 2>&1; mpv --no-video --no-terminal \"" + fullPath + "\" &";
-                std::system(playCmd.c_str());
-                isPlaying = true;
-                break;
+                    std::string playCmd = "killall mpv >/dev/null 2>&1; mpv --no-video --no-terminal \"" + fullPath + "\" &";
+                    std::system(playCmd.c_str());
+
+                    startTime = std::chrono::steady_clock::now();
+                    isPlaying = true;
+                    break;
+                }
+                case 27:
+                case 'q':
+                    inPlayer = false;
+                    break;
             }
-            case 27:
-            case 'q':
-                inPlayer = false;
-                break;
         }
+
+        // Pequeña pausa para no saturar CPU en el bucle nodelay
+        std::this_thread::sleep_for(std::chrono::milliseconds(150));
     }
+
+    // Restaurar bloqueo en getch al salir
+    nodelay(stdscr, FALSE);
 }
