@@ -13,9 +13,6 @@ void showWebMenu() {
     int selected = 0;
     bool inWebMenu = true;
 
-    // Bandera universal para forzar la salida de audio por ALSA
-    std::string audioFlags = "--alsa-output-device=default ";
-
     while (inWebMenu) {
         clear();
 
