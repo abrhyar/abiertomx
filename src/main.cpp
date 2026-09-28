@@ -44,31 +44,32 @@ int main() {
     int selected = 0;
     bool running = true;
 
-    // Control de lectura de temperatura
-    std::string currentTemp = getCPUTemp();
-    auto lastTempCheck = std::chrono::steady_clock::now();
+    // Inicialización del monitor de sistema (CPU, RAM, Temp)
+    std::string currentStats = getSystemStats();
+    auto lastStatsCheck = std::chrono::steady_clock::now();
 
     while (running) {
         clear();
 
-        // Actualizar temperatura solo si transcurrieron 10 segundos
+        // Actualizar métricas cada 10 segundos
         auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - lastTempCheck).count() >= 10) {
-            currentTemp = getCPUTemp();
-            lastTempCheck = now;
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - lastStatsCheck).count() >= 10) {
+            currentStats = getSystemStats();
+            lastStatsCheck = now;
         }
 
+        // Encabezado con título e indicadores de hardware
         attron(COLOR_PAIR(2) | A_BOLD);
-        mvprintw(0, 1, "ABIERTO v0.1 | ALk");
+        mvprintw(0, 1, "ABIERTO");
         attroff(COLOR_PAIR(2) | A_BOLD);
 
-        std::string tempStr = "[" + currentTemp + "]";
         attron(COLOR_PAIR(3));
-        mvprintw(0, 30, "%s", tempStr.c_str());
+        mvprintw(0, 12, "[%s]", currentStats.c_str());
         attroff(COLOR_PAIR(3));
 
         mvhline(1, 0, ACS_HLINE, 38);
 
+        // Renderizado del menú
         int startY = 3;
         for (size_t i = 0; i < menuItems.size(); ++i) {
             if ((int)i == selected) {
@@ -85,6 +86,7 @@ int main() {
 
         refresh();
 
+        // Captura de controles
         int ch = getch();
         switch (ch) {
             case KEY_UP:

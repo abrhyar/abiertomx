@@ -10,6 +10,6 @@ struct MenuItem {
 };
 
 void runCommand(const std::string& cmd);
-std::string getCPUTemp();
+std::string getSystemStats(); // <-- Devuelve CPU, RAM y Temp
 
 #endif
