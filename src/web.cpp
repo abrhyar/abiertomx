@@ -13,6 +13,9 @@ void showWebMenu() {
     int selected = 0;
     bool inWebMenu = true;
 
+    // Bandera universal para forzar la salida de audio por ALSA
+    std::string audioFlags = "--alsa-output-device=default ";
+
     while (inWebMenu) {
         clear();
 
@@ -51,17 +54,19 @@ void showWebMenu() {
             case 10:
             case KEY_ENTER:
                 if (webOptions[selected].command == "THORIUM") {
-                    std::string cmd = "sudo xinit /usr/bin/thorium-browser "
+                    std::string cmd = "xinit /usr/bin/thorium-browser "
                                       "--kiosk --no-sandbox --ignore-gpu-blocklist "
                                       "--enable-gpu-rasterization --enable-zero-copy --use-gl=egl "
                                       "--enable-features=VaapiVideoDecoder,CanvasOopRasterization "
+                                      "--alsa-output-device=default "
                                       "\"https://google.com\" -- :0";
                     runCommand(cmd);
                 } else if (webOptions[selected].command == "YOUTUBE") {
-                    std::string cmd = "sudo xinit /usr/bin/thorium-browser "
+                    std::string cmd = "xinit /usr/bin/thorium-browser "
                                       "--kiosk --no-sandbox --ignore-gpu-blocklist "
                                       "--enable-gpu-rasterization --enable-zero-copy --use-gl=egl "
                                       "--enable-features=VaapiVideoDecoder,CanvasOopRasterization "
+                                      "--alsa-output-device=default "
                                       "--user-agent=\"Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) Version/6.0 TV Safari/537.36\" "
                                       "\"https://youtube.com/tv\" -- :0";
                     runCommand(cmd);
