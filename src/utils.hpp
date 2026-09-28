@@ -10,5 +10,6 @@ struct MenuItem {
 };
 
 void runCommand(const std::string& cmd);
+std::string getCPUTemp();
 
 #endif

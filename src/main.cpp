@@ -3,12 +3,13 @@
 #include <ncurses.h>
 #include <vector>
 #include <string>
+#include <chrono>
 
 #include "utils.hpp"
 #include "games.hpp"
 #include "camera.hpp"
 #include "gallery.hpp"
-#include "web.hpp" // <-- Agregado
+#include "web.hpp"
 
 int main() {
     setlocale(LC_ALL, "");
@@ -31,7 +32,7 @@ int main() {
 
     std::vector<MenuItem> menuItems = {
         {"[PAD]", "Juegos", "SUBMENU_GAMES"},
-        {"[WEB]", "Web", "SUBMENU_WEB"}, // <-- Nueva sección agregada
+        {"[WEB]", "Web", "SUBMENU_WEB"},
         {"[CAM]", "Camara", "SUBMENU_CAM"},
         {"[MUS]", "Musica", ""},
         {"[VID]", "Videos", "SUBMENU_VIDS"},
@@ -43,15 +44,27 @@ int main() {
     int selected = 0;
     bool running = true;
 
+    // Control de lectura de temperatura cada 30 segundos
+    std::string currentTemp = getCPUTemp();
+    auto lastTempCheck = std::chrono::steady_clock::now();
+
     while (running) {
         clear();
+
+        // Actualizar temperatura solo si transcurrieron 30 segundos
+        auto now = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - lastTempCheck).count() >= 30) {
+            currentTemp = getCPUTemp();
+            lastTempCheck = now;
+        }
 
         attron(COLOR_PAIR(2) | A_BOLD);
         mvprintw(0, 1, "ABIERTO v0.1 | ALk");
         attroff(COLOR_PAIR(2) | A_BOLD);
 
+        std::string tempStr = "[" + currentTemp + "]";
         attron(COLOR_PAIR(3));
-        mvprintw(0, 30, "[64%%]");
+        mvprintw(0, 30, "%s", tempStr.c_str());
         attroff(COLOR_PAIR(3));
 
         mvhline(1, 0, ACS_HLINE, 38);
@@ -95,7 +108,7 @@ int main() {
                 } else if (menuItems[selected].command == "SUBMENU_CAM") {
                     showCameraView();
                 } else if (menuItems[selected].command == "SUBMENU_WEB") {
-                    showWebMenu(); // <-- Llamada a la nueva sección
+                    showWebMenu();
                 } else if (!menuItems[selected].command.empty()) {
                     runCommand(menuItems[selected].command);
                 }
