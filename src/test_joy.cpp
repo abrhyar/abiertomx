@@ -28,16 +28,17 @@ int main() {
         std::cout << "Mueve la palanca o presiona los botones (Ctrl+C para salir)" << std::endl;
 
         while (true) {
-            auto vals = request.get_values();
+    auto vals = request.get_values();
 
-            for (size_t i = 0; i < vals.size(); ++i) {
-                if (vals[i] == gpiod::line::value::INACTIVE) {
-                    std::cout << "DETECTADO: " << names[i] << std::endl;
-                }
-            }
+    std::cout << "\r[PC5/DWN:" << (vals[0] == gpiod::line::value::ACTIVE ? "1" : "0") << "] "
+              << "[PC6/UP:"  << (vals[1] == gpiod::line::value::ACTIVE ? "1" : "0") << "] "
+              << "[PC8/LFT:" << (vals[2] == gpiod::line::value::ACTIVE ? "1" : "0") << "] "
+              << "[PC9/RHT:" << (vals[3] == gpiod::line::value::ACTIVE ? "1" : "0") << "] "
+              << "[PC11/MID:"<< (vals[4] == gpiod::line::value::ACTIVE ? "1" : "0") << "]" 
+              << std::flush;
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(150));
-        }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+}
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
     }
