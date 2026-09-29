@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <chrono>
+#include <thread>
 
 #include "utils.hpp"
 #include "games.hpp"
@@ -15,10 +16,14 @@
 int main() {
     setlocale(LC_ALL, "");
 
+    // Inicializar lectura GPIO
+    initJoystickGPIO();
+
     initscr();
     cbreak();
     noecho();
     keypad(stdscr, TRUE);
+    nodelay(stdscr, TRUE); // Para que getch() no bloquee la lectura del joystick
     curs_set(0);
 
     if (has_colors()) {
@@ -45,21 +50,18 @@ int main() {
     int selected = 0;
     bool running = true;
 
-    // Inicialización del monitor de sistema (CPU, RAM, Temp)
     std::string currentStats = getSystemStats();
     auto lastStatsCheck = std::chrono::steady_clock::now();
 
     while (running) {
         clear();
 
-        // Actualizar métricas cada 10 segundos
         auto now = std::chrono::steady_clock::now();
         if (std::chrono::duration_cast<std::chrono::seconds>(now - lastStatsCheck).count() >= 10) {
             currentStats = getSystemStats();
             lastStatsCheck = now;
         }
 
-        // Encabezado con título e indicadores de hardware
         attron(COLOR_PAIR(2) | A_BOLD);
         mvprintw(0, 1, "ABIERTO");
         attroff(COLOR_PAIR(2) | A_BOLD);
@@ -70,7 +72,6 @@ int main() {
 
         mvhline(1, 0, ACS_HLINE, 38);
 
-        // Renderizado del menú
         int startY = 3;
         for (size_t i = 0; i < menuItems.size(); ++i) {
             if ((int)i == selected) {
@@ -87,16 +88,22 @@ int main() {
 
         refresh();
 
-        // Captura de controles
+        // Captura dual: Teclado o Joystick GPIO
         int ch = getch();
+        if (ch == ERR) {
+            ch = readJoystickInput();
+        }
+
         switch (ch) {
             case KEY_UP:
             case 'k':
                 selected = (selected - 1 + (int)menuItems.size()) % (int)menuItems.size();
+                std::this_thread::sleep_for(std::chrono::milliseconds(150)); // Debounce
                 break;
             case KEY_DOWN:
             case 'j':
                 selected = (selected + 1) % (int)menuItems.size();
+                std::this_thread::sleep_for(std::chrono::milliseconds(150)); // Debounce
                 break;
             case 10:
             case KEY_ENTER:
@@ -117,8 +124,11 @@ int main() {
                 } else if (!menuItems[selected].command.empty()) {
                     runCommand(menuItems[selected].command);
                 }
+                std::this_thread::sleep_for(std::chrono::milliseconds(250));
                 break;
         }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
     }
 
     endwin();

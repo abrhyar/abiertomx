@@ -10,6 +10,10 @@ struct MenuItem {
 };
 
 void runCommand(const std::string& cmd);
-std::string getSystemStats(); // <-- Devuelve CPU, RAM y Temp
+std::string getSystemStats(); 
+
+// --- INTEGRACIÓN GPIO JOYSTICK ---
+bool initJoystickGPIO();
+int readJoystickInput(); // Retorna KEY_UP, KEY_DOWN, 10 (ENTER) o -1 si no hay pulso
 
 #endif
