@@ -44,12 +44,12 @@ int readJoystickInput() {
     try {
         auto vals = gpio_request->get_values();
 
-        // 0 (LOW) significa presionado/contacto a COM (GND)
-        if (vals[1] == gpiod::line::value::LOW) return KEY_UP;   // Linea 70 (UP)
-        if (vals[0] == gpiod::line::value::LOW) return KEY_DOWN; // Linea 69 (DWN)
-        if (vals[2] == gpiod::line::value::LOW) return KEY_LEFT; // Linea 72 (LFT)
-        if (vals[3] == gpiod::line::value::LOW) return KEY_RIGHT;// Linea 73 (RHT)
-        if (vals[4] == gpiod::line::value::LOW) return 10;       // Linea 75 (MID / Enter)
+        // INACTIVE (0) significa que el pin se fue a masa/GND (pulsado)
+        if (vals[1] == gpiod::line::value::INACTIVE) return KEY_UP;    // Linea 70 (UP)
+        if (vals[0] == gpiod::line::value::INACTIVE) return KEY_DOWN;  // Linea 69 (DWN)
+        if (vals[2] == gpiod::line::value::INACTIVE) return KEY_LEFT;  // Linea 72 (LFT)
+        if (vals[3] == gpiod::line::value::INACTIVE) return KEY_RIGHT; // Linea 73 (RHT)
+        if (vals[4] == gpiod::line::value::INACTIVE) return 10;        // Linea 75 (MID / Enter)
     } catch (...) {}
 
     return -1; // Sin pulsación
